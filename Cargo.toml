@@ -1,0 +1,18 @@
+[package]
+name = "squircle-frame"
+version = "0.1.0"
+edition = "2024"
+description = "Generate Sketch-like smooth corner and squircle frame cubic Bezier paths."
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/squircle-frame"
+keywords = ["squircle", "bezier", "svg", "sketch", "corner"]
+categories = ["graphics", "rendering"]
+repository = "https://github.com/MarcellGu/SquircleFrame.git"
+include = ["Cargo.lock", "Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**"]
+
+[[bin]]
+name = "demo"
+path = "src/demo.rs"
+
+[dependencies]
