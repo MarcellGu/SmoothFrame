@@ -1,21 +1,10 @@
-![SmoothFrame Logo](assets/icon.png)
+![SmoothFrame](demo.svg)
 
 # SmoothFrame
 
-`smooth-frame` 是一个独立、零依赖的 Rust crate，用来生成 Sketch-like smooth corner / smooth frame 的 cubic Bezier 路径。
+SmoothFrame 是一个零依赖的 Rust 几何库，用来生成接近 Sketch「Smooth Corners」效果的 cubic Bezier **路径**。
 
-它不是只支持矩形的工具。矩形只是便捷封装，底层模型是：
-
-- `SmoothCorner`：任意凸角 primitive
-- `SmoothFrame`：闭合凸 polygon / frame
-- `SmoothRect`：矩形便捷 API
-
-输出命令可以直接映射到底层图形 API：
-
-- SVG：`M / L / C / Z`
-- Canvas：`moveTo / lineTo / bezierCurveTo`
-- Skia：`moveTo / lineTo / cubicTo`
-- Godot：`Curve2D`，或将 cubic 采样为 polygon
+它只负责算路径，不绑定任何渲染后端。你可以把输出命令直接接到 SVG、Canvas、Skia、Godot 或自己的绘图管线里。
 
 ## 安装
 
@@ -24,115 +13,93 @@
 smooth-frame = "0.1"
 ```
 
+项目使用 Rust 2024 edition，最低 Rust 版本为 `1.85`。
+
 ## 快速开始
+
+最常用的入口是 `SmoothRect`：
 
 ```rust
 use smooth_frame::SmoothRect;
 
 fn main() {
-    let path = SmoothRect::new(1000.0, 1000.0)
-        .with_radius(100.0)
+    let path = SmoothRect::new(240.0, 120.0)
+        .with_radius(32.0)
         .with_smoothing(0.6)
         .to_path();
 
-    println!("{}", path.to_svg_path_with_precision(3));
+    println!("{}", path.to_svg_path_with_precision(2));
 }
 ```
 
-## 命令行示例
+`radius` 是核心圆半径，`smoothing` 是 Sketch 风格的平滑系数，会被限制在 `0..=1`。
 
-仓库内置了一个 example 示例，可以直接生成 SVG path：
+生成出来的 `SmoothPath` 可以：
+
+- 用 `to_svg_path()` 或 `to_svg_path_with_precision()` 输出 SVG path data。
+- 用 `commands()` 读取 `MoveTo / LineTo / CubicTo / Close` 命令。
+- 用 `cubics()` 提取所有 cubic Bezier 段，方便测试、采样或接入其他 API。
+
+## 运行示例
+
+仓库里带了一个 demo，可以直接生成路径或完整 SVG：
 
 ```bash
 cargo run --example demo
+cargo run --example demo -- --svg > smooth.svg
+cargo run --example demo -- --output smooth.svg
 ```
 
-也可以调整参数，或生成完整 SVG 文件：
+也可以调整尺寸、半径、平滑系数和边框：
 
 ```bash
-cargo run --example demo -- --width 1000 --height 1000 --radius 250 --smoothing 0.6
-cargo run --example demo -- --output smooth.svg
-cargo run --example demo -- --output smooth.svg --border 4
+cargo run --example demo -- \
+  --width 1000 \
+  --height 600 \
+  --radius 160 \
+  --smoothing 0.6 \
+  --border 4 \
+  --output smooth.svg
 ```
 
-默认生成 `1000 x 1000`、角半径为 `250` 的 smooth corner SVG。生成 SVG 文件时会按边框宽度向内收缩路径，并将路径平移半个边框宽度，避免
-stroke 被裁切。
+查看所有参数：
 
-`SmoothRect` 以本机 `sketchtool` 的矩形输出为准。常规 smooth 区间通常是：
-
-```text
-M A,0
-L w-A,0
-C ...
-C ...
-C ...
-L w,h-A
-C ...
-C ...
-C ...
-L A,h
-C ...
-C ...
-C ...
-L 0,A
-C ...
-C ...
-C ...
-Z
+```bash
+cargo run --example demo -- --help
 ```
 
-也就是 4 条边和 4 个角，每角最多 3 段 cubic，总计最多 12 段 cubic。与 `sketchtool` 一样，矩形便捷 API 会省略零长度边或首尾零长度
-cubic；当半径进入近圆或近 capsule 区间时，也会退化为 SketchTool 的普通圆角、圆或 capsule-like 结构。
+## API 一览
 
-如果需要始终保留每角 3 段 cubic 的低层 primitive，可以直接使用 `SmoothCorner` 或 `SmoothFrame`。
+### `SmoothRect`
 
-## 通用角点
+矩形便捷 API，也是最接近 SketchTool 导出结果的入口。
 
 ```rust
-use smooth_frame::{Point, SmoothCorner, Vector};
+use smooth_frame::SmoothRect;
 
 fn main() {
-    let cubics = SmoothCorner::new(
-        Point::new(100.0, 0.0),
-        Vector::new(-1.0, 0.0),
-        Vector::new(0.0, 1.0),
-    )
-        .with_radius(24.0)
+    let path = SmoothRect::new(1000.0, 500.0)
+        .with_radius(120.0)
         .with_smoothing(0.6)
-        .with_limits(80.0, 60.0)
-        .to_cubic_segments()?;
-    Ok::<_, smooth_frame::SmoothError>(())
+        .to_path();
+
+    let svg_path = path.to_svg_path_with_precision(3);
 }
 ```
 
-输入语义：
+普通区间下，一个矩形最多会生成 4 条边和 12 段 cubic。接近圆形或胶囊形时，SketchTool 会退化成普通圆角、圆或 capsule-like 结构；
+`SmoothRect` 会跟随这种行为。
 
-```text
-origin         当前角点
-incoming_axis  从角点指向上一条边的方向
-outgoing_axis  从角点指向下一条边的方向
-radius         核心圆半径
-smoothing      Sketch-like smoothing，自动 clamp 到 [0, 1]
-incoming_limit incoming 方向最大影响范围
-outgoing_limit outgoing 方向最大影响范围
-```
+如果你需要每个角始终保留 3 段 cubic 的 primitive，请使用 `SmoothCorner` 或 `SmoothFrame`。
 
-约束：
+### `SmoothFrame`
 
-```text
-radius >= 0
-0 < angle_between(incoming_axis, outgoing_axis) < PI
-radius clamp 到当前角可容纳的最大核心半径
-```
-
-`radius == 0` 时，frame / rect 输出普通折角路径；`SmoothCorner::to_cubic_segments()` 返回空数组。
-
-## 闭合 frame / polygon
+用于闭合凸多边形。
 
 ```rust
-use smooth_frame::{Point, SmoothFrame};
+use smooth_frame::{Point, SmoothError, SmoothFrame};
 
-fn main() {
+fn main() -> Result<(), SmoothError> {
     let path = SmoothFrame::closed([
         Point::new(0.0, 0.0),
         Point::new(220.0, 30.0),
@@ -142,162 +109,136 @@ fn main() {
         .with_radius(24.0)
         .with_smoothing(0.5)
         .to_path()?;
-    Ok::<_, smooth_frame::SmoothError>(())
+
+    println!("{}", path.to_svg_path());
+    Ok(())
 }
 ```
 
-v1 支持闭合凸 polygon。凹角目前返回 `SmoothError::ConcaveFrame`，自相交路径返回 `SmoothError::SelfIntersectingFrame`，API
-设计保留后续支持 concave corner 的空间。
+`SmoothFrame` 会检查输入点：
 
-## 90° 矩形公式
+- 少于 3 个点会返回 `TooFewPoints`。
+- 退化边、共线点或面积为 0 会返回 `DegenerateFrame`。
+- 凹多边形会返回 `ConcaveFrame`。
+- 自相交路径会返回 `SelfIntersectingFrame`。
 
-对矩形 90° 角，本库复刻 Sketch-like smooth corner 控制点规律：
+### `SmoothCorner`
 
-```text
-r = clamp(radius, 0, min(width, height) / 2)
-s = clamp(smoothing, 0, 1)
-
-rawA = (1 + s) * r
-
-Ax = min(rawA, width / 2)
-Ay = min(rawA, height / 2)
-
-alpha_x = clamp(Ax / r - 1, 0, 1) * PI / 4
-alpha_y = clamp(Ay / r - 1, 0, 1) * PI / 4
-```
-
-未饱和时：
-
-```text
-A = (1 + smoothing) * radius
-```
-
-饱和后：
-
-```text
-A = side / 2
-effective_smoothing = clamp(A / radius - 1, 0, 1)
-```
-
-矩形便捷 API 在近圆或近 capsule 区间继续以 `sketchtool` 为准：当 SketchTool 退化为普通圆角、圆或 capsule-like 结构时，
-`SmoothRect` 也做同样退化。
-
-## 单角 cubic 模板
-
-局部坐标中，`u` 沿进入边从角点指向边上的起点，`v` 沿离开边从角点指向边上的终点：
-
-```text
-start = (A0, 0)
-end   = (0, A1)
-```
-
-90° 角使用固定 3 段 cubic：
-
-```text
-tan0 = tan(alpha0 / 2)
-tangent0 = r - r * tan0
-handle0 = (A0 - tangent0) / 3
-
-p1 = (
-  r - r * sin(alpha0),
-  r - r * cos(alpha0)
-)
-
-theta = PI / 2 - alpha0 - alpha1
-arcHandle = if theta <= 0 then 0 else (4 / 3) * tan(theta / 4) * r
-
-p2 = (
-  r - r * cos(alpha1),
-  r - r * sin(alpha1)
-)
-
-tan1 = tan(alpha1 / 2)
-tangent1 = r - r * tan1
-handle1 = (A1 - tangent1) / 3
-```
-
-```text
-C1:
-ctrl1 = (A0 - 2 * handle0, 0)
-ctrl2 = (tangent0, 0)
-to    = p1
-
-C2:
-ctrl1 = (p1.x - arcHandle * cos(alpha0), p1.y + arcHandle * sin(alpha0))
-ctrl2 = (p2.x + arcHandle * sin(alpha1), p2.y - arcHandle * cos(alpha1))
-to    = p2
-
-C3:
-ctrl1 = (0, tangent1)
-ctrl2 = (0, tangent1 + handle1)
-to    = (0, A1)
-```
-
-## 非 90° 泛化
-
-对任意凸角：
-
-```text
-phi = angle_between(incoming_axis, outgoing_axis)
-0 < phi < PI
-
-base_tangent = r / tan(phi / 2)
-
-rawA = (1 + smoothing) * base_tangent
-
-A0 = min(rawA, incoming_limit)
-A1 = min(rawA, outgoing_limit)
-
-alpha0 = clamp(A0 / base_tangent - 1, 0, 1) * phi / 2
-alpha1 = clamp(A1 / base_tangent - 1, 0, 1) * phi / 2
-
-middle_arc_angle = phi - alpha0 - alpha1
-```
-
-当 `phi = PI / 2` 时，这组公式退化回上面的 Sketch-like 矩形公式。
-
-## 与 Sketch / sketchtool 的关系
-
-矩形便捷 API 的目标是复刻 `sketchtool` 对 Sketch smooth corner 矩形的实际路径输出。
-
-需要特别注意：
-
-- `SmoothRect` 以 `sketchtool` 为准，包括近圆段的普通圆角、圆或 capsule-like fallback。
-- `SmoothCorner` / `SmoothFrame` 保留通用 smooth corner primitive，适合非矩形或需要稳定 primitive 的场景。
-- 对 `SmoothRect`，本库输出与 `sketchtool` 导出的 SVG path 只应存在浮点级误差。
-
-测试中包含两层约束：
-
-- 单元测试内置 `1000x1000, r=100, smoothing=0.6` 的 Sketch-like 控制点参考。
-- 集成测试会在本机存在 `sketchtool` 时，通过 `sketchtool run-script` 在内存中逐个创建 smooth rect，导出 SVG Buffer，立刻删除该
-  shape，再继续下一个用例。
-- 集成测试覆盖 `1000x1000, smoothing=0.6, radius=0..=500`，多组 `smoothing`，以及多种矩形比例。
-- 所有纳入矩阵的用例都会逐条比较 `M/L/C/Z` 控制点，要求只存在浮点级误差；不再为近圆 fallback 放宽结构差异。
-- 使用 `-- --nocapture` 运行时，测试会输出一张按尺寸、smoothing、radius 区间和命令结构汇总的对齐结果表。
-
-可通过环境变量控制 SketchTool 路径和强制要求：
-
-```bash
-SMOOTH_FRAME_SKETCHTOOL=/Applications/Sketch.app/Contents/MacOS/sketchtool cargo test
-SMOOTH_FRAME_REQUIRE_SKETCHTOOL=1 cargo test
-```
-
-由于 `sketchtool` SVG 会进行十进制格式化，集成测试使用 `1e-5` 的比较容差。
-
-## 路径输出
+用于单个凸角。它是更底层的 primitive，适合你自己管理边、角和拼接顺序的场景。
 
 ```rust
-fn main() {
-    let path = smooth_frame::SmoothRect::new(1000.0, 500.0)
-        .with_radius(250.0)
-        .with_smoothing(0.6)
-        .to_path();
+use smooth_frame::{Point, SmoothCorner, SmoothError, Vector};
 
-    let commands = path.commands();
-    let cubics = path.cubic_segments();
-    let svg = path.to_svg_path();
-    let compact_svg = path.to_svg_path_with_precision(3);
+fn main() -> Result<(), SmoothError> {
+    let cubics = SmoothCorner::new(
+        Point::new(100.0, 0.0),
+        Vector::new(-1.0, 0.0),
+        Vector::new(0.0, 1.0),
+    )
+        .with_radius(24.0)
+        .with_smoothing(0.6)
+        .with_limits(80.0, 60.0)
+        .to_cubics()?;
+
+    println!("cubic 段数：{}", cubics.len());
+    Ok(())
 }
 ```
 
-`to_svg_path_with_precision` 会裁掉多余尾随零，例如 `1000.000` 会输出为 `1000`。
+输入语义：
+
+- `origin`：当前角点。
+- `incoming_axis`：从角点指向上一条边的方向。
+- `outgoing_axis`：从角点指向下一条边的方向。
+- `with_radius()`：核心圆半径。
+- `with_smoothing()`：Sketch-like smoothing，计算时会 clamp 到 `0..=1`。
+- `with_limits()`：incoming / outgoing 两侧允许占用的最大长度。
+
+## 接到渲染 API
+
+路径命令是有意保持简单的：
+
+```rust
+use smooth_frame::PathCommand;
+
+fn main() {
+    for command in path.commands() {
+        match *command {
+            PathCommand::MoveTo(p) => {
+                // SVG: M x,y
+                // Canvas: moveTo(x, y)
+            }
+            PathCommand::LineTo(p) => {
+                // SVG: L x,y
+                // Canvas: lineTo(x, y)
+            }
+            PathCommand::CubicTo { ctrl1, ctrl2, to } => {
+                // SVG: C c1x,c1y c2x,c2y x,y
+                // Canvas: bezierCurveTo(c1x, c1y, c2x, c2y, x, y)
+            }
+            PathCommand::Close => {
+                // SVG: Z
+                // Canvas: closePath()
+            }
+        }
+    }
+}
+```
+
+`CubicSegment` 里包含 `from / ctrl1 / ctrl2 / to`，如果你的后端更喜欢一段一段处理 Bezier，可以直接使用 `path.cubics()`。
+
+## 和 SketchTool 的关系
+
+`SmoothRect` 的目标是对齐 SketchTool 对 smooth corner 矩形的实际 SVG 导出，而不是只实现一个近似公式。
+
+测试里包含两类约束：
+
+- 内置几何单元测试，覆盖常见矩形、最大半径、胶囊形、圆形退化、凸多边形、错误输入等情况。
+- 如果本机安装了 SketchTool，集成测试会批量创建 Sketch smooth rect、导出 SVG、逐条比较 `M / L / C / Z` 控制点。
+
+默认情况下，找不到 SketchTool 时会跳过集成测试。如果本机能找到 SketchTool，`cargo test` 会跑完整对齐矩阵，这一步可能比较慢。只想验证
+SketchTool 对齐时可以单独运行：
+
+```bash
+cargo test --test sketchtool -- --nocapture
+```
+
+需要指定 SketchTool 路径或强制要求本机必须存在 SketchTool 时：
+
+```bash
+SMOOTH_FRAME_SKETCHTOOL=/Applications/Sketch.app/Contents/MacOS/sketchtool cargo test --test sketchtool
+SMOOTH_FRAME_REQUIRE_SKETCHTOOL=1 cargo test --test sketchtool
+```
+
+## 开发
+
+```bash
+cargo test --test geometry
+cargo test --test sketchtool -- --nocapture
+cargo run --example demo -- --help
+cargo fmt
+```
+
+日常改几何逻辑时先跑 `cargo test --test geometry` 就够快；需要确认 Sketch 导出兼容性时再跑
+`cargo test --test sketchtool -- --nocapture`。
+
+这个 crate 没有运行时依赖。公开 API 统一从 crate 根导出，所以使用方只需要写：
+
+```rust
+use smooth_frame::{Point, SmoothFrame, SmoothRect};
+```
+
+源码按职责拆分在 `src/` 下：
+
+- `lib.rs`：crate 入口和公开类型 re-export。
+- `geometry.rs`：`Point`、`Vector` 和基础几何运算。
+- `path.rs`：`SmoothPath`、`PathCommand`、`CubicSegment` 和 SVG path 输出。
+- `corner.rs`：单个 smooth corner 的几何计算。
+- `frame.rs`：闭合凸多边形 frame。
+- `rect.rs`：SketchTool 对齐的矩形便捷实现。
+- `error.rs`：`SmoothError`。
+- `math.rs`：内部数值工具和容差常量。
+
+## 许可证
+
+Apache-2.0

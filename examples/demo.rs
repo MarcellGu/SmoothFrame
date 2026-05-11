@@ -25,7 +25,7 @@ impl Default for Config {
             radius: Some(225.0),
             smoothing: 0.6,
             precision: 3,
-            border_width: 2.0,
+            border_width: 0.0,
             svg: false,
             output: None,
         }
@@ -205,15 +205,29 @@ fn value_after_equals(arg: &str) -> &str {
 
 fn render_svg(config: &Config, path_data: &str) -> String {
     let offset = config.border_width / 2.0;
+    let stroke_attrs = if config.border_width > 0.0 {
+        format!(
+            r##" stroke="#0F172A" stroke-opacity="0.12" stroke-width="{}""##,
+            format_number(config.border_width)
+        )
+    } else {
+        String::new()
+    };
 
     format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {canvas_width} {canvas_height}" width="{canvas_width}" height="{canvas_height}">
-  <path d="{path_data}" transform="translate({offset} {offset})" fill="#6EE7B7" stroke="#0F172A" stroke-width="{border_width}"/>
+  <defs>
+    <linearGradient id="smooth-frame-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0EA5E9"/>
+      <stop offset="48%" stop-color="#2DD4BF"/>
+      <stop offset="100%" stop-color="#FDE68A"/>
+    </linearGradient>
+  </defs>
+  <path d="{path_data}" transform="translate({offset} {offset})" fill="url(#smooth-frame-fill)"{stroke_attrs}/>
 </svg>"##,
         canvas_width = format_number(config.width),
         canvas_height = format_number(config.height),
         offset = format_number(offset),
-        border_width = format_number(config.border_width),
     )
 }
 
@@ -243,7 +257,7 @@ fn print_help() {
   --radius <数字>      核心圆半径，默认 250
   --smoothing <数字>   平滑系数，范围 0..1，默认 0.6
   --precision <整数>   SVG path 小数位数，默认 3
-  --border <数字>      SVG 边框宽度，默认 2
+  --border <数字>      SVG 边框宽度，默认 0
   --svg               输出完整 SVG，而不是只输出 path
   -o, --output <路径>  生成完整 SVG 文件
   -h, --help          显示帮助
