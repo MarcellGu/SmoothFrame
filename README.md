@@ -1,4 +1,6 @@
-# smooth-frame
+![SmoothFrame Logo](assets/icon.png)
+
+# SmoothFrame
 
 `smooth-frame` 是一个独立、零依赖的 Rust crate，用来生成 Sketch-like smooth corner / smooth frame 的 cubic Bezier 路径。
 
@@ -27,12 +29,14 @@ smooth-frame = "0.1"
 ```rust
 use smooth_frame::SmoothRect;
 
-let path = SmoothRect::new(1000.0, 1000.0)
-.with_radius(100.0)
-.with_smoothing(0.6)
-.to_path();
+fn main() {
+    let path = SmoothRect::new(1000.0, 1000.0)
+        .with_radius(100.0)
+        .with_smoothing(0.6)
+        .to_path();
 
-println!("{}", path.to_svg_path_with_precision(3));
+    println!("{}", path.to_svg_path_with_precision(3));
+}
 ```
 
 ## 命令行示例
@@ -87,16 +91,18 @@ cubic；当半径进入近圆或近 capsule 区间时，也会退化为 SketchTo
 ```rust
 use smooth_frame::{Point, SmoothCorner, Vector};
 
-let cubics = SmoothCorner::new(
-Point::new(100.0, 0.0),
-Vector::new(- 1.0, 0.0),
-Vector::new(0.0, 1.0),
-)
-.with_radius(24.0)
-.with_smoothing(0.6)
-.with_limits(80.0, 60.0)
-.to_cubic_segments() ?;
-# Ok::<_, smooth_frame::SmoothError>(())
+fn main() {
+    let cubics = SmoothCorner::new(
+        Point::new(100.0, 0.0),
+        Vector::new(-1.0, 0.0),
+        Vector::new(0.0, 1.0),
+    )
+        .with_radius(24.0)
+        .with_smoothing(0.6)
+        .with_limits(80.0, 60.0)
+        .to_cubic_segments()?;
+    Ok::<_, smooth_frame::SmoothError>(())
+}
 ```
 
 输入语义：
@@ -126,16 +132,18 @@ radius clamp 到当前角可容纳的最大核心半径
 ```rust
 use smooth_frame::{Point, SmoothFrame};
 
-let path = SmoothFrame::closed([
-Point::new(0.0, 0.0),
-Point::new(220.0, 30.0),
-Point::new(180.0, 170.0),
-Point::new(20.0, 140.0),
-])
-.with_radius(24.0)
-.with_smoothing(0.5)
-.to_path() ?;
-# Ok::<_, smooth_frame::SmoothError>(())
+fn main() {
+    let path = SmoothFrame::closed([
+        Point::new(0.0, 0.0),
+        Point::new(220.0, 30.0),
+        Point::new(180.0, 170.0),
+        Point::new(20.0, 140.0),
+    ])
+        .with_radius(24.0)
+        .with_smoothing(0.5)
+        .to_path()?;
+    Ok::<_, smooth_frame::SmoothError>(())
+}
 ```
 
 v1 支持闭合凸 polygon。凹角目前返回 `SmoothError::ConcaveFrame`，自相交路径返回 `SmoothError::SelfIntersectingFrame`，API
@@ -279,15 +287,17 @@ SMOOTH_FRAME_REQUIRE_SKETCHTOOL=1 cargo test
 ## 路径输出
 
 ```rust
-let path = smooth_frame::SmoothRect::new(1000.0, 500.0)
-.with_radius(250.0)
-.with_smoothing(0.6)
-.to_path();
+fn main() {
+    let path = smooth_frame::SmoothRect::new(1000.0, 500.0)
+        .with_radius(250.0)
+        .with_smoothing(0.6)
+        .to_path();
 
-let commands = path.commands();
-let cubics = path.cubic_segments();
-let svg = path.to_svg_path();
-let compact_svg = path.to_svg_path_with_precision(3);
+    let commands = path.commands();
+    let cubics = path.cubic_segments();
+    let svg = path.to_svg_path();
+    let compact_svg = path.to_svg_path_with_precision(3);
+}
 ```
 
 `to_svg_path_with_precision` 会裁掉多余尾随零，例如 `1000.000` 会输出为 `1000`。
