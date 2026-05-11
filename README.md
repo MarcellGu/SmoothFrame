@@ -159,9 +159,14 @@ fn main() -> Result<(), SmoothError> {
 路径命令是有意保持简单的：
 
 ```rust
-use smooth_frame::PathCommand;
+use smooth_frame::{PathCommand, SmoothRect};
 
 fn main() {
+    let path = SmoothRect::new(240.0, 120.0)
+        .with_radius(32.0)
+        .with_smoothing(0.6)
+        .to_path();
+
     for command in path.commands() {
         match *command {
             PathCommand::MoveTo(p) => {

@@ -15,9 +15,10 @@ include = [
     "Cargo.toml",
     "LICENSE",
     "README.md",
+    "demo.svg",
     "examples/**",
     "src/**",
-    "tests/**",
+    "tests/**/*.rs",
 ]
 
 [dependencies]
