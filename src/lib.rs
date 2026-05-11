@@ -1,7 +1,9 @@
-//! Sketch-like smooth corner / squircle frame 的 cubic Bezier 几何库。
+//! Sketch-like smooth corner / smooth frame 的 cubic Bezier 几何库。
 //!
 //! 低层类型 [`SmoothCorner`] 支持任意凸角；[`SmoothFrame`] 负责闭合凸多边形；
 //! [`SmoothRect`] 只是矩形便捷封装。
+
+#![warn(missing_docs)]
 
 use std::error::Error;
 use std::f64::consts::PI;
@@ -14,16 +16,20 @@ const SKETCH_FALLBACK_EFFECTIVE_SMOOTHING: f64 = 0.005;
 /// 二维点。
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Point {
+    /// X 坐标。
     pub x: f64,
+    /// Y 坐标。
     pub y: f64,
 }
 
 impl Point {
+    /// 创建一个二维点。
     #[must_use]
     pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
 
+    /// 判断坐标是否都是有限数值。
     #[must_use]
     pub fn is_finite(self) -> bool {
         self.x.is_finite() && self.y.is_finite()
@@ -57,41 +63,50 @@ impl Sub<Vector> for Point {
 /// 二维向量。
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Vector {
+    /// X 分量。
     pub x: f64,
+    /// Y 分量。
     pub y: f64,
 }
 
 impl Vector {
+    /// 创建一个二维向量。
     #[must_use]
     pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
 
+    /// 判断分量是否都是有限数值。
     #[must_use]
     pub fn is_finite(self) -> bool {
         self.x.is_finite() && self.y.is_finite()
     }
 
+    /// 返回向量长度。
     #[must_use]
     pub fn length(self) -> f64 {
         self.length_squared().sqrt()
     }
 
+    /// 返回向量长度的平方。
     #[must_use]
     pub const fn length_squared(self) -> f64 {
         self.x * self.x + self.y * self.y
     }
 
+    /// 返回两个向量的点积。
     #[must_use]
     pub const fn dot(self, other: Vector) -> f64 {
         self.x * other.x + self.y * other.y
     }
 
+    /// 返回两个向量的二维叉积。
     #[must_use]
     pub const fn cross(self, other: Vector) -> f64 {
         self.x * other.y - self.y * other.x
     }
 
+    /// 返回单位向量；零长度或非有限向量返回 `None`。
     #[must_use]
     pub fn normalized(self) -> Option<Vector> {
         let length = self.length();
@@ -101,6 +116,7 @@ impl Vector {
         Some(self / length)
     }
 
+    /// 返回两个向量之间的夹角，单位为弧度。
     #[must_use]
     pub fn angle_between(self, other: Vector) -> Option<f64> {
         let a = self.normalized()?;
@@ -160,22 +176,33 @@ impl Neg for Vector {
 /// 一段 cubic Bezier，包含起点，便于直接映射到底层渲染 API。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CubicSegment {
+    /// cubic 起点。
     pub from: Point,
+    /// 第一个控制点。
     pub ctrl1: Point,
+    /// 第二个控制点。
     pub ctrl2: Point,
+    /// cubic 终点。
     pub to: Point,
 }
 
 /// 可直接映射到 SVG Canvas Skia 等 API 的路径命令。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PathCommand {
+    /// 移动当前点。
     MoveTo(Point),
+    /// 从当前点绘制直线。
     LineTo(Point),
+    /// 从当前点绘制 cubic Bezier。
     CubicTo {
+        /// 第一个控制点。
         ctrl1: Point,
+        /// 第二个控制点。
         ctrl2: Point,
+        /// cubic 终点。
         to: Point,
     },
+    /// 闭合当前子路径。
     Close,
 }
 
@@ -186,16 +213,19 @@ pub struct SmoothPath {
 }
 
 impl SmoothPath {
+    /// 创建空路径。
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// 返回底层路径命令。
     #[must_use]
     pub fn commands(&self) -> &[PathCommand] {
         &self.commands
     }
 
+    /// 提取路径中的所有 cubic 段。
     #[must_use]
     pub fn cubics(&self) -> Vec<CubicSegment> {
         let mut cubics = Vec::new();
@@ -231,28 +261,34 @@ impl SmoothPath {
         cubics
     }
 
+    /// 追加 `MoveTo` 命令。
     pub fn move_to(&mut self, point: Point) {
         self.commands.push(PathCommand::MoveTo(point));
     }
 
+    /// 追加 `LineTo` 命令。
     pub fn line_to(&mut self, point: Point) {
         self.commands.push(PathCommand::LineTo(point));
     }
 
+    /// 追加 `CubicTo` 命令。
     pub fn cubic_to(&mut self, ctrl1: Point, ctrl2: Point, to: Point) {
         self.commands
             .push(PathCommand::CubicTo { ctrl1, ctrl2, to });
     }
 
+    /// 追加闭合路径命令。
     pub fn close(&mut self) {
         self.commands.push(PathCommand::Close);
     }
 
+    /// 以默认 6 位小数输出 SVG path data。
     #[must_use]
     pub fn to_svg_path(&self) -> String {
         self.to_svg_path_with_precision(6)
     }
 
+    /// 按指定小数位数输出 SVG path data。
     #[must_use]
     pub fn to_svg_path_with_precision(&self, precision: usize) -> String {
         let mut parts = Vec::with_capacity(self.commands.len());
@@ -282,13 +318,21 @@ impl SmoothPath {
 /// 几何计算错误。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SmoothError {
+    /// 输入包含 `NaN` 或不允许的无穷值。
     NonFiniteInput,
+    /// 长度、半径或限制为负数。
     NegativeInput,
+    /// 角点方向向量长度过小。
     DegenerateAxis,
+    /// 角点夹角不在开区间 `(0, PI)` 内。
     InvalidAngle,
+    /// 闭合 frame 少于 3 个点。
     TooFewPoints,
+    /// frame 包含退化边、共线点或面积为零。
     DegenerateFrame,
+    /// frame 存在凹角，当前版本暂不支持。
     ConcaveFrame,
+    /// frame 存在自相交边。
     SelfIntersectingFrame,
 }
 
@@ -312,21 +356,37 @@ impl Error for SmoothError {}
 /// 单个 smooth corner 解析后的参数，便于测试或调试 Sketch 对齐。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SmoothCornerGeometry {
+    /// 原始角点。
     pub origin: Point,
+    /// 从角点指向上一条边的单位方向。
     pub incoming_axis: Vector,
+    /// 从角点指向下一条边的单位方向。
     pub outgoing_axis: Vector,
+    /// clamp 后实际使用的核心圆半径。
     pub radius: f64,
+    /// clamp 到 `[0, 1]` 后的平滑系数。
     pub smoothing: f64,
+    /// incoming 方向的最大影响范围。
     pub incoming_limit: f64,
+    /// outgoing 方向的最大影响范围。
     pub outgoing_limit: f64,
+    /// incoming 与 outgoing 方向之间的夹角，单位为弧度。
     pub angle: f64,
+    /// 核心圆在未平滑时的切点距离。
     pub base_tangent: f64,
+    /// incoming 方向最终影响范围。
     pub incoming_influence: f64,
+    /// outgoing 方向最终影响范围。
     pub outgoing_influence: f64,
+    /// incoming 侧过渡角，单位为弧度。
     pub alpha0: f64,
+    /// outgoing 侧过渡角，单位为弧度。
     pub alpha1: f64,
+    /// 中间圆弧段角度，单位为弧度。
     pub middle_arc_angle: f64,
+    /// 角点 smooth cubic 的起点。
     pub start: Point,
+    /// 角点 smooth cubic 的终点。
     pub end: Point,
 }
 
@@ -343,6 +403,9 @@ pub struct SmoothCorner {
 }
 
 impl SmoothCorner {
+    /// 创建一个任意凸角的 smooth corner。
+    ///
+    /// `incoming_axis` 从角点指向上一条边，`outgoing_axis` 从角点指向下一条边。
     #[must_use]
     pub fn new(origin: Point, incoming_axis: Vector, outgoing_axis: Vector) -> Self {
         Self {
@@ -356,18 +419,21 @@ impl SmoothCorner {
         }
     }
 
+    /// 设置核心圆半径。
     #[must_use]
     pub fn with_radius(mut self, radius: f64) -> Self {
         self.radius = radius;
         self
     }
 
+    /// 设置 Sketch-like smoothing，计算时会 clamp 到 `[0, 1]`。
     #[must_use]
     pub fn with_smoothing(mut self, smoothing: f64) -> Self {
         self.smoothing = smoothing;
         self
     }
 
+    /// 设置 incoming / outgoing 两侧可占用的最大长度。
     #[must_use]
     pub fn with_limits(mut self, incoming_limit: f64, outgoing_limit: f64) -> Self {
         self.incoming_limit = incoming_limit;
@@ -375,6 +441,7 @@ impl SmoothCorner {
         self
     }
 
+    /// 解析 smooth corner 的几何参数。
     pub fn geometry(&self) -> Result<SmoothCornerGeometry, SmoothError> {
         if !self.origin.is_finite()
             || !self.incoming_axis.is_finite()
@@ -461,6 +528,9 @@ impl SmoothCorner {
         })
     }
 
+    /// 生成最多 3 段 cubic Bezier。
+    ///
+    /// 半径为 0 或被限制压缩到 0 时返回空数组。
     pub fn to_cubics(&self) -> Result<Vec<CubicSegment>, SmoothError> {
         let geometry = self.geometry()?;
         if geometry.radius <= EPSILON {
@@ -533,6 +603,9 @@ pub struct SmoothFrame {
 }
 
 impl SmoothFrame {
+    /// 创建闭合 frame。
+    ///
+    /// 当前版本要求输入点组成非退化凸多边形。
     #[must_use]
     pub fn closed(points: impl IntoIterator<Item = Point>) -> Self {
         Self {
@@ -542,23 +615,27 @@ impl SmoothFrame {
         }
     }
 
+    /// 设置每个角的核心圆半径。
     #[must_use]
     pub fn with_radius(mut self, radius: f64) -> Self {
         self.radius = radius;
         self
     }
 
+    /// 设置每个角的 Sketch-like smoothing，计算时会 clamp 到 `[0, 1]`。
     #[must_use]
     pub fn with_smoothing(mut self, smoothing: f64) -> Self {
         self.smoothing = smoothing;
         self
     }
 
+    /// 返回 frame 输入点。
     #[must_use]
     pub fn points(&self) -> &[Point] {
         &self.points
     }
 
+    /// 生成闭合 smooth frame 路径。
     pub fn to_path(&self) -> Result<SmoothPath, SmoothError> {
         self.validate_frame()?;
 
@@ -682,6 +759,9 @@ pub struct SmoothRect {
 }
 
 impl SmoothRect {
+    /// 创建矩形便捷封装。
+    ///
+    /// 宽高为非有限数、负数或零时会退化为单点闭合路径。
     #[must_use]
     pub fn new(width: f64, height: f64) -> Self {
         Self {
@@ -692,18 +772,25 @@ impl SmoothRect {
         }
     }
 
+    /// 设置矩形角半径。
+    ///
+    /// 负数或非有限数会按 0 处理，过大的半径会 clamp 到短边的一半。
     #[must_use]
     pub fn with_radius(mut self, radius: f64) -> Self {
         self.radius = radius;
         self
     }
 
+    /// 设置 Sketch-like smoothing。
+    ///
+    /// 有限数会 clamp 到 `[0, 1]`，非有限数会按 0 处理。
     #[must_use]
     pub fn with_smoothing(mut self, smoothing: f64) -> Self {
         self.smoothing = smoothing;
         self
     }
 
+    /// 生成矩形 smooth corner 路径。
     #[must_use]
     pub fn to_path(&self) -> SmoothPath {
         let width = sanitize_dimension(self.width);

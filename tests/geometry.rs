@@ -1,4 +1,4 @@
-use squircle_frame::{
+use smooth_frame::{
     PathCommand, Point, SmoothCorner, SmoothError, SmoothFrame, SmoothRect, Vector,
 };
 use std::f64::consts::PI;

@@ -1,18 +1,23 @@
 [package]
-name = "squircle-frame"
+name = "smooth-frame"
 version = "0.1.0"
 edition = "2024"
-description = "Generate Sketch-like smooth corner and squircle frame cubic Bezier paths."
+rust-version = "1.85"
+description = "Generate Sketch-like smooth corner and smooth frame cubic Bezier paths."
 license = "Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/squircle-frame"
-keywords = ["squircle", "bezier", "svg", "sketch", "corner"]
+documentation = "https://docs.rs/smooth-frame"
+keywords = ["smooth", "bezier", "svg", "sketch", "corner"]
 categories = ["graphics", "rendering"]
-repository = "https://github.com/MarcellGu/SquircleFrame.git"
-include = ["Cargo.lock", "Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**"]
-
-[[bin]]
-name = "demo"
-path = "src/demo.rs"
+repository = "https://github.com/MarcellGu/SmoothFrame.git"
+include = [
+    "Cargo.lock",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "examples/**",
+    "src/**",
+    "tests/**",
+]
 
 [dependencies]

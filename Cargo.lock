@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "squircle-frame"
+name = "smooth-frame"
 version = "0.1.0"

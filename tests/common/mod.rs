@@ -1,4 +1,4 @@
-use squircle_frame::{PathCommand, Point, SmoothRect};
+use smooth_frame::{PathCommand, Point, SmoothRect};
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -59,7 +59,7 @@ impl From<PathCommand> for SvgCommand {
 }
 
 pub fn find_sketchtool() -> Option<PathBuf> {
-    if let Some(path) = env::var_os("SQUIRCLE_FRAME_SKETCHTOOL").map(PathBuf::from) {
+    if let Some(path) = env::var_os("SMOOTH_FRAME_SKETCHTOOL").map(PathBuf::from) {
         return path.exists().then_some(path);
     }
 

@@ -12,8 +12,8 @@ const EXPECTED_SKETCHTOOL_CASES: usize = 1_720;
 #[test]
 fn sketchtool_in_memory_rect_matrix_matches() {
     let Some(sketchtool) = find_sketchtool() else {
-        if env::var_os("SQUIRCLE_FRAME_REQUIRE_SKETCHTOOL").is_some() {
-            panic!("未找到 sketchtool，但 SQUIRCLE_FRAME_REQUIRE_SKETCHTOOL 已启用");
+        if env::var_os("SMOOTH_FRAME_REQUIRE_SKETCHTOOL").is_some() {
+            panic!("未找到 sketchtool，但 SMOOTH_FRAME_REQUIRE_SKETCHTOOL 已启用");
         }
         eprintln!("跳过 sketchtool 集成测试：未找到 sketchtool");
         return;

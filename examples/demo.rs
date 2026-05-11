@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-use squircle_frame::SmoothRect;
+use smooth_frame::SmoothRect;
 
 #[derive(Debug, Clone)]
 struct Config {
@@ -38,7 +38,7 @@ fn main() {
         Ok(None) => return,
         Err(message) => {
             eprintln!("参数错误：{message}");
-            eprintln!("运行 `cargo run --bin demo -- --help` 查看用法。");
+            eprintln!("运行 `cargo run --example demo -- --help` 查看用法。");
             process::exit(2);
         }
     };
@@ -232,10 +232,10 @@ fn print_help() {
 生成 Sketch-like smooth corner 矩形的 SVG path 或完整 SVG。
 
 用法：
-  cargo run --bin demo
-  cargo run --bin demo -- --width 1000 --height 1000 --radius 250 --smoothing 0.6
-  cargo run --bin demo -- --svg > squircle.svg
-  cargo run --bin demo -- --output squircle.svg
+  cargo run --example demo
+  cargo run --example demo -- --width 1000 --height 1000 --radius 250 --smoothing 0.6
+  cargo run --example demo -- --svg > smooth.svg
+  cargo run --example demo -- --output smooth.svg
 
 参数：
   --width <数字>       矩形宽度，默认 1000
