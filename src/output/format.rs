@@ -1,5 +1,5 @@
 use crate::output::path::PathCommand;
-use crate::utils::format_point;
+use crate::utils::{MAX_FORMAT_PRECISION, bounded_precision, format_point};
 
 /// 将通用路径命令转换成具体后端输出的扩展契约。
 ///
@@ -21,10 +21,17 @@ pub struct SvgPathFormat {
 
 impl SvgPathFormat {
     /// 创建 SVG path data formatter。
+    ///
+    /// 小数位数最多保留 12 位，超过该上限时会自动 clamp。
     #[must_use]
     pub fn new(precision: usize) -> Self {
-        Self { precision }
+        Self {
+            precision: bounded_precision(precision),
+        }
     }
+
+    /// SVG path data 输出支持的最大小数位数。
+    pub const MAX_PRECISION: usize = MAX_FORMAT_PRECISION;
 
     /// 返回坐标小数位数。
     #[must_use]

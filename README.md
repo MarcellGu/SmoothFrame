@@ -10,7 +10,7 @@ SmoothFrame 是一个零依赖的 Rust 几何库，用来生成接近 Sketch「S
 
 ```toml
 [dependencies]
-smooth-frame = "0.1"
+smooth-frame = "0.2"
 ```
 
 项目使用 Rust 2024 edition，最低 Rust 版本为 `1.85`。

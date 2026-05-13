@@ -128,7 +128,7 @@ impl SmoothPath {
         self.export_with(&SvgPathFormat::default())
     }
 
-    /// 按指定小数位数输出 SVG path data。
+    /// 按指定小数位数输出 SVG path data，最多保留 12 位。
     #[must_use]
     pub fn to_svg_path_with_precision(&self, precision: usize) -> String {
         self.export_with(&SvgPathFormat::new(precision))
