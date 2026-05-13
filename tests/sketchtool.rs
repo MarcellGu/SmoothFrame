@@ -1,6 +1,7 @@
-mod common;
+#[path = "support/sketchtool.rs"]
+mod sketchtool;
 
-use common::{
+use sketchtool::{
     assert_case_matches, find_sketchtool, parse_sketchtool_cases, print_alignment_table,
     sketchtool_script,
 };
@@ -9,6 +10,7 @@ use std::process::Command;
 
 const EXPECTED_SKETCHTOOL_CASES: usize = 1_720;
 
+// 验证本库 SmoothRect 输出与 SketchTool 导出的矩形路径矩阵一致。
 #[test]
 fn sketchtool_in_memory_rect_matrix_matches() {
     let Some(sketchtool) = find_sketchtool() else {

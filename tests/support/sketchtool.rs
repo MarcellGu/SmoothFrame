@@ -48,6 +48,7 @@ struct SummaryRow {
 }
 
 impl From<PathCommand> for SvgCommand {
+    // 将库路径命令转换成测试侧 SVG 命令表示。
     fn from(command: PathCommand) -> Self {
         match command {
             PathCommand::MoveTo(point) => SvgCommand::MoveTo(point),
@@ -58,6 +59,7 @@ impl From<PathCommand> for SvgCommand {
     }
 }
 
+// 查找本机可用的 SketchTool 可执行文件。
 pub fn find_sketchtool() -> Option<PathBuf> {
     if let Some(path) = env::var_os("SMOOTH_FRAME_SKETCHTOOL").map(PathBuf::from) {
         return path.exists().then_some(path);
@@ -75,6 +77,7 @@ pub fn find_sketchtool() -> Option<PathBuf> {
         .find(|path| path.exists())
 }
 
+// 生成用于批量导出 Sketch smooth rect 的 JavaScript 脚本。
 pub fn sketchtool_script() -> String {
     r#"
 var api=require('sketch');
@@ -165,6 +168,7 @@ try { doc.close(); } catch(e) {}
     .to_owned()
 }
 
+// 从 SketchTool stdout 中解析所有对齐用例。
 pub fn parse_sketchtool_cases(stdout: &str) -> Vec<SketchtoolCase> {
     stdout
         .lines()
@@ -189,6 +193,7 @@ pub fn parse_sketchtool_cases(stdout: &str) -> Vec<SketchtoolCase> {
         .collect()
 }
 
+// 断言单个 SketchTool 用例与本库输出一致。
 pub fn assert_case_matches(case: SketchtoolCase) -> CaseResult {
     let sketch_commands = parse_svg_path(&case.path);
     let ours = SmoothRect::new(case.width, case.height)
@@ -233,6 +238,7 @@ pub fn assert_case_matches(case: SketchtoolCase) -> CaseResult {
     }
 }
 
+// 打印 SketchTool 对齐结果的汇总表。
 pub fn print_alignment_table(results: &[CaseResult]) {
     let mut rows: Vec<SummaryRow> = Vec::new();
 
@@ -291,6 +297,7 @@ pub fn print_alignment_table(results: &[CaseResult]) {
     }
 }
 
+// 清理 Sketch 控制台输出中可能包裹的引号。
 fn clean_sketch_console_line(line: &str) -> &str {
     let line = line.trim();
     if line.len() >= 2 && line.starts_with('\'') && line.ends_with('\'') {
@@ -300,6 +307,7 @@ fn clean_sketch_console_line(line: &str) -> &str {
     }
 }
 
+// 根据用例名称判断所属测试矩阵。
 fn case_suite(name: &str) -> String {
     if name.starts_with("square_r_") {
         "square-radius-sweep".to_owned()
@@ -312,6 +320,7 @@ fn case_suite(name: &str) -> String {
     }
 }
 
+// 统计 SVG 命令序列中的命令结构。
 fn command_shape(commands: &[SvgCommand]) -> String {
     let mut moves = 0;
     let mut lines = 0;
@@ -328,6 +337,7 @@ fn command_shape(commands: &[SvgCommand]) -> String {
     format!("M{moves} L{lines} C{cubics} Z{closes}")
 }
 
+// 将连续半径合并成便于阅读的区间字符串。
 fn format_radii(radii: &[f64]) -> String {
     let mut radii = radii.to_vec();
     radii.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -354,6 +364,7 @@ fn format_radii(radii: &[f64]) -> String {
     ranges.join(",")
 }
 
+// 解析 SketchTool 导出的 SVG path data。
 fn parse_svg_path(path: &str) -> Vec<SvgCommand> {
     let tokens = tokenize_svg_path(path);
     let mut cursor = 0;
@@ -399,6 +410,7 @@ enum Token {
     Number(f64),
 }
 
+// 将 SVG path 字符串切分成命令和数字 token。
 fn tokenize_svg_path(path: &str) -> Vec<Token> {
     let chars = path.chars().collect::<Vec<_>>();
     let mut cursor = 0;
@@ -441,10 +453,12 @@ fn tokenize_svg_path(path: &str) -> Vec<Token> {
     tokens
 }
 
+// 从 token 流中读取一个二维点。
 fn read_point(tokens: &[Token], cursor: &mut usize) -> Point {
     Point::new(read_number(tokens, cursor), read_number(tokens, cursor))
 }
 
+// 从 token 流中读取一个浮点数。
 fn read_number(tokens: &[Token], cursor: &mut usize) -> f64 {
     let number = match tokens.get(*cursor) {
         Some(Token::Number(number)) => *number,
@@ -454,6 +468,7 @@ fn read_number(tokens: &[Token], cursor: &mut usize) -> f64 {
     number
 }
 
+// 断言两个 SVG 命令在容差内一致并返回最大误差。
 fn assert_svg_command_close(
     actual: SvgCommand,
     expected: SvgCommand,
@@ -489,12 +504,14 @@ fn assert_svg_command_close(
     }
 }
 
+// 断言两个点在 SketchTool 对齐容差内一致。
 fn assert_point_close(actual: Point, expected: Point, case_name: &str, index: usize) -> f64 {
     let x_diff = assert_number_close(actual.x, expected.x, case_name, index);
     let y_diff = assert_number_close(actual.y, expected.y, case_name, index);
     x_diff.max(y_diff)
 }
 
+// 断言两个浮点数在 SketchTool 对齐容差内一致。
 fn assert_number_close(actual: f64, expected: f64, case_name: &str, index: usize) -> f64 {
     let diff = (actual - expected).abs();
     assert!(
@@ -505,6 +522,7 @@ fn assert_number_close(actual: f64, expected: f64, case_name: &str, index: usize
     diff
 }
 
+// 按指定精度格式化测试汇总中的数字。
 fn format_number(value: f64, precision: usize) -> String {
     let mut text = format!("{value:.precision$}");
     if text.contains('.') {

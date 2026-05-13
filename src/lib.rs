@@ -5,17 +5,18 @@
 
 #![warn(missing_docs)]
 
-mod corner;
-mod error;
-mod frame;
-mod geometry;
-mod math;
-mod path;
-mod rect;
+mod errors;
+mod input;
+mod output;
+mod process;
+mod types;
+mod utils;
 
-pub use corner::{SmoothCorner, SmoothCornerGeometry};
-pub use error::SmoothError;
-pub use frame::SmoothFrame;
-pub use geometry::{Point, Vector};
-pub use path::{CubicSegment, PathCommand, SmoothPath};
-pub use rect::SmoothRect;
+pub use errors::SmoothError;
+pub use input::corner::SmoothCorner;
+pub use input::frame::SmoothFrame;
+pub use input::rect::SmoothRect;
+pub use output::format::{PathFormatter, SvgPathFormat};
+pub use output::path::{CubicSegment, PathCommand, SmoothPath};
+pub use process::corner::SmoothCornerGeometry;
+pub use types::geometry::{Point, Vector};

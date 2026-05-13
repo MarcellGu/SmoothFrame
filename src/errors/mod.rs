@@ -23,6 +23,7 @@ pub enum SmoothError {
 }
 
 impl fmt::Display for SmoothError {
+    // 将几何错误转换为面向调用方的中文错误信息。
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SmoothError::NonFiniteInput => write!(f, "输入包含非有限数值"),

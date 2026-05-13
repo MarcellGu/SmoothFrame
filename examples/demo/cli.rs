@@ -1,23 +1,19 @@
-use std::env;
-use std::fs;
 use std::path::PathBuf;
-use std::process;
-
-use smooth_frame::SmoothRect;
 
 #[derive(Debug, Clone)]
-struct Config {
-    width: f64,
-    height: f64,
-    radius: Option<f64>,
-    smoothing: f64,
-    precision: usize,
-    border_width: f64,
-    svg: bool,
-    output: Option<PathBuf>,
+pub(crate) struct Config {
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) radius: Option<f64>,
+    pub(crate) smoothing: f64,
+    pub(crate) precision: usize,
+    pub(crate) border_width: f64,
+    pub(crate) svg: bool,
+    pub(crate) output: Option<PathBuf>,
 }
 
 impl Default for Config {
+    // 提供 demo 的默认尺寸、半径和输出选项。
     fn default() -> Self {
         Self {
             width: 1000.0,
@@ -32,49 +28,8 @@ impl Default for Config {
     }
 }
 
-fn main() {
-    let config = match parse_args(env::args().skip(1)) {
-        Ok(Some(config)) => config,
-        Ok(None) => return,
-        Err(message) => {
-            eprintln!("参数错误：{message}");
-            eprintln!("运行 `cargo run --example demo -- --help` 查看用法。");
-            process::exit(2);
-        }
-    };
-
-    let drawable_width = drawable_dimension(config.width, config.border_width);
-    let drawable_height = drawable_dimension(config.height, config.border_width);
-    let radius = effective_radius(&config);
-    let path = SmoothRect::new(drawable_width, drawable_height)
-        .with_radius(radius)
-        .with_smoothing(config.smoothing)
-        .to_path();
-    let path_data = path.to_svg_path_with_precision(config.precision);
-
-    if let Some(output) = config.output.as_ref() {
-        let svg = render_svg(&config, &path_data);
-        if let Err(error) = fs::write(output, svg) {
-            eprintln!("写入 SVG 文件失败：{}：{error}", output.display());
-            process::exit(1);
-        }
-        println!("已生成 SVG 文件：{}", output.display());
-    } else if config.svg {
-        println!("{}", render_svg(&config, &path_data));
-    } else {
-        println!("SVG 宽度：{}", format_number(config.width));
-        println!("SVG 高度：{}", format_number(config.height));
-        println!("路径宽度：{}", format_number(drawable_width));
-        println!("路径高度：{}", format_number(drawable_height));
-        println!("半径：{}", format_number(radius));
-        println!("平滑：{}", format_number(config.smoothing));
-        println!("边框：{}", format_number(config.border_width));
-        println!("命令数：{}", path.commands().len());
-        println!("SVG path：{path_data}");
-    }
-}
-
-fn parse_args(args: impl Iterator<Item = String>) -> Result<Option<Config>, String> {
+// 将命令行参数解析成 demo 配置。
+pub(crate) fn parse_args(args: impl Iterator<Item = String>) -> Result<Option<Config>, String> {
     let mut config = Config::default();
     let mut args = args.peekable();
 
@@ -128,6 +83,7 @@ fn parse_args(args: impl Iterator<Item = String>) -> Result<Option<Config>, Stri
     Ok(Some(config))
 }
 
+// 校验 demo 输入是否处于可渲染范围。
 fn validate_config(config: &Config) -> Result<(), String> {
     if !config.width.is_finite() || config.width <= 0.0 {
         return Err("--width 必须是大于 0 的有限数字".to_owned());
@@ -155,14 +111,17 @@ fn validate_config(config: &Config) -> Result<(), String> {
     Ok(())
 }
 
-fn effective_radius(config: &Config) -> f64 {
+// 返回最终用于几何计算的圆角半径。
+pub(crate) fn effective_radius(config: &Config) -> f64 {
     config.radius.unwrap_or(250.0)
 }
 
-fn drawable_dimension(svg_dimension: f64, border_width: f64) -> f64 {
+// 根据边框宽度计算实际路径尺寸。
+pub(crate) fn drawable_dimension(svg_dimension: f64, border_width: f64) -> f64 {
     svg_dimension - border_width
 }
 
+// 解析带参数名的浮点数参数。
 fn parse_f64_arg(name: &str, value: Option<String>) -> Result<f64, String> {
     parse_f64_value(
         name,
@@ -172,6 +131,7 @@ fn parse_f64_arg(name: &str, value: Option<String>) -> Result<f64, String> {
     )
 }
 
+// 解析带参数名的无符号整数参数。
 fn parse_usize_arg(name: &str, value: Option<String>) -> Result<usize, String> {
     parse_usize_value(
         name,
@@ -181,64 +141,33 @@ fn parse_usize_arg(name: &str, value: Option<String>) -> Result<usize, String> {
     )
 }
 
+// 解析文件路径参数。
 fn parse_path_arg(name: &str, value: Option<String>) -> Result<PathBuf, String> {
     value
         .map(PathBuf::from)
         .ok_or_else(|| format!("缺少 {name} 的值"))
 }
 
+// 将字符串值解析为浮点数。
 fn parse_f64_value(name: &str, value: &str) -> Result<f64, String> {
     value
         .parse()
         .map_err(|_| format!("{name} 的值 `{value}` 不是有效数字"))
 }
 
+// 将字符串值解析为无符号整数。
 fn parse_usize_value(name: &str, value: &str) -> Result<usize, String> {
     value
         .parse()
         .map_err(|_| format!("{name} 的值 `{value}` 不是有效整数"))
 }
 
+// 取出 `--key=value` 形式参数中的值。
 fn value_after_equals(arg: &str) -> &str {
     arg.split_once('=').map_or("", |(_, value)| value)
 }
 
-fn render_svg(config: &Config, path_data: &str) -> String {
-    let offset = config.border_width / 2.0;
-    let stroke_attrs = if config.border_width > 0.0 {
-        format!(
-            r##" stroke="#0F172A" stroke-opacity="0.12" stroke-width="{}""##,
-            format_number(config.border_width)
-        )
-    } else {
-        String::new()
-    };
-
-    format!(
-        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {canvas_width} {canvas_height}" width="{canvas_width}" height="{canvas_height}">
-  <defs>
-    <linearGradient id="smooth-frame-fill" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0EA5E9"/>
-      <stop offset="48%" stop-color="#2DD4BF"/>
-      <stop offset="100%" stop-color="#FDE68A"/>
-    </linearGradient>
-  </defs>
-  <path d="{path_data}" transform="translate({offset} {offset})" fill="url(#smooth-frame-fill)"{stroke_attrs}/>
-</svg>"##,
-        canvas_width = format_number(config.width),
-        canvas_height = format_number(config.height),
-        offset = format_number(offset),
-    )
-}
-
-fn format_number(value: f64) -> String {
-    let formatted = format!("{value:.3}");
-    formatted
-        .trim_end_matches('0')
-        .trim_end_matches('.')
-        .to_owned()
-}
-
+// 打印 demo 的命令行帮助信息。
 fn print_help() {
     println!(
         r#"demo

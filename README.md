@@ -39,6 +39,7 @@ fn main() {
 - 用 `to_svg_path()` 或 `to_svg_path_with_precision()` 输出 SVG path data。
 - 用 `commands()` 读取 `MoveTo / LineTo / CubicTo / Close` 命令。
 - 用 `cubics()` 提取所有 cubic Bezier 段，方便测试、采样或接入其他 API。
+- 用 `export_with()` 接入自定义 `PathFormatter`，输出 Godot、Canvas 或函数调用等格式。
 
 ## 运行示例
 
@@ -156,7 +157,7 @@ fn main() -> Result<(), SmoothError> {
 
 ## 接到渲染 API
 
-路径命令是有意保持简单的：
+输出层以 `SmoothPath` 作为稳定中间表示，SVG 只是内置 formatter。需要接到其他后端时，可以直接读取路径命令：
 
 ```rust
 use smooth_frame::{PathCommand, SmoothRect};
@@ -192,6 +193,41 @@ fn main() {
 
 `CubicSegment` 里包含 `from / ctrl1 / ctrl2 / to`，如果你的后端更喜欢一段一段处理 Bezier，可以直接使用 `path.cubics()`。
 
+也可以实现 `PathFormatter`，把输出格式作为独立扩展点：
+
+```rust
+use smooth_frame::{PathCommand, PathFormatter, SmoothRect};
+
+struct FunctionCallFormat;
+
+impl PathFormatter for FunctionCallFormat {
+    type Output = Vec<String>;
+
+    fn format(&self, commands: &[PathCommand]) -> Self::Output {
+        commands
+            .iter()
+            .map(|command| match *command {
+                PathCommand::MoveTo(p) => format!("move_to({}, {})", p.x, p.y),
+                PathCommand::LineTo(p) => format!("line_to({}, {})", p.x, p.y),
+                PathCommand::CubicTo { ctrl1, ctrl2, to } => format!(
+                    "cubic_to({}, {}, {}, {}, {}, {})",
+                    ctrl1.x, ctrl1.y, ctrl2.x, ctrl2.y, to.x, to.y
+                ),
+                PathCommand::Close => "close()".to_owned(),
+            })
+            .collect()
+    }
+}
+
+fn main() {
+    let calls = SmoothRect::new(240.0, 120.0)
+        .with_radius(32.0)
+        .with_smoothing(0.6)
+        .to_path()
+        .export_with(&FunctionCallFormat);
+}
+```
+
 ## 和 SketchTool 的关系
 
 `SmoothRect` 的目标是对齐 SketchTool 对 smooth corner 矩形的实际 SVG 导出，而不是只实现一个近似公式。
@@ -208,6 +244,8 @@ SketchTool 对齐时可以单独运行：
 cargo test --test sketchtool -- --nocapture
 ```
 
+重复运行 SketchTool 集成测试前，建议先手动退出 Sketch。SketchTool 会调用本机 Sketch 进行导出，Sketch 已打开或上一次测试后仍停留在后台时，可能复用旧状态或占用导出环境，导致重复测试结果不稳定。
+
 需要指定 SketchTool 路径或强制要求本机必须存在 SketchTool 时：
 
 ```bash
@@ -218,13 +256,16 @@ SMOOTH_FRAME_REQUIRE_SKETCHTOOL=1 cargo test --test sketchtool
 ## 开发
 
 ```bash
-cargo test --test geometry
+cargo test --test rect
+cargo test --test corner
+cargo test --test frame
+cargo test --test path
 cargo test --test sketchtool -- --nocapture
 cargo run --example demo -- --help
 cargo fmt
 ```
 
-日常改几何逻辑时先跑 `cargo test --test geometry` 就够快；需要确认 Sketch 导出兼容性时再跑
+日常改矩形逻辑时先跑 `cargo test --test rect` 就够快；需要确认 Sketch 导出兼容性时再跑
 `cargo test --test sketchtool -- --nocapture`。
 
 这个 crate 没有运行时依赖。公开 API 统一从 crate 根导出，所以使用方只需要写：
@@ -233,16 +274,35 @@ cargo fmt
 use smooth_frame::{Point, SmoothFrame, SmoothRect};
 ```
 
-源码按职责拆分在 `src/` 下：
+源码按输入层、处理层、输出层拆分在 `src/` 下：
 
 - `lib.rs`：crate 入口和公开类型 re-export。
-- `geometry.rs`：`Point`、`Vector` 和基础几何运算。
-- `path.rs`：`SmoothPath`、`PathCommand`、`CubicSegment` 和 SVG path 输出。
-- `corner.rs`：单个 smooth corner 的几何计算。
-- `frame.rs`：闭合凸多边形 frame。
-- `rect.rs`：SketchTool 对齐的矩形便捷实现。
-- `error.rs`：`SmoothError`。
-- `math.rs`：内部数值工具和容差常量。
+- `input/`：公开输入入口，负责参数校验、输入清洗和格式归一化。
+- `input/corner.rs`：`SmoothCorner` 输入封装，校验单角方向、半径和平滑系数。
+- `input/rect/`：`SmoothRect` 矩形便捷输入，处理尺寸归一化、矩形角适配和路径拼接。
+- `input/frame/`：`SmoothFrame` 闭合凸多边形输入，负责点集校验、角点适配和路径拼接。
+- `process/`：核心处理层，定义 crate 私有 `Processor` trait，只包含 smooth corner 纯几何计算。
+- `process/corner/`：单个 smooth corner 的几何解析、圆弧坐标和 cubic 生成。
+- `output/format.rs`：公开 `PathFormatter` 扩展契约和内置 `SvgPathFormat`。
+- `output/path.rs`：`SmoothPath`、`PathCommand`、`CubicSegment` 和 formatter 委托入口。
+- `types/geometry.rs`：`Point`、`Vector` 和基础几何运算。
+- `errors/mod.rs`：`SmoothError`。
+- `utils/mod.rs`：内部数值工具、格式化工具和容差常量。
+
+测试按领域拆分在 `tests/` 下：
+
+- `rect.rs`：矩形 smooth corner 结构和 Sketch-like 退化行为。
+- `corner.rs`：单角 primitive 的几何公式。
+- `frame.rs`：凸多边形 frame 和错误输入。
+- `path.rs`：路径输出格式。
+- `sketchtool.rs`：SketchTool 集成对齐矩阵。
+- `support/`：测试断言和 SketchTool 解析辅助。
+
+示例 demo 拆分在 `examples/demo/` 下：
+
+- `main.rs`：串联参数解析、路径生成和输出。
+- `cli.rs`：命令行参数解析与输入校验。
+- `svg.rs`：完整 SVG 渲染和数字格式化。
 
 ## 许可证
 

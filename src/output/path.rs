@@ -1,4 +1,6 @@
-use crate::geometry::Point;
+use crate::types::Point;
+
+use super::format::{PathFormatter, SvgPathFormat};
 
 /// 一段 cubic Bezier，包含起点，便于直接映射到底层渲染 API。
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -109,62 +111,26 @@ impl SmoothPath {
         self.commands.push(PathCommand::Close);
     }
 
+    /// 使用指定 formatter 导出路径。
+    ///
+    /// 这是输出层的主要扩展点：调用方可以实现 [`PathFormatter`]，把同一组
+    /// [`PathCommand`] 转换成 SVG、Godot、Canvas 或自定义函数调用格式。
+    pub fn export_with<F>(&self, formatter: &F) -> F::Output
+    where
+        F: PathFormatter + ?Sized,
+    {
+        formatter.format(self.commands())
+    }
+
     /// 以默认 6 位小数输出 SVG path data。
     #[must_use]
     pub fn to_svg_path(&self) -> String {
-        self.to_svg_path_with_precision(6)
+        self.export_with(&SvgPathFormat::default())
     }
 
     /// 按指定小数位数输出 SVG path data。
     #[must_use]
     pub fn to_svg_path_with_precision(&self, precision: usize) -> String {
-        let mut parts = Vec::with_capacity(self.commands.len());
-        for command in &self.commands {
-            match *command {
-                PathCommand::MoveTo(point) => {
-                    parts.push(format!("M {}", format_point(point, precision)));
-                }
-                PathCommand::LineTo(point) => {
-                    parts.push(format!("L {}", format_point(point, precision)));
-                }
-                PathCommand::CubicTo { ctrl1, ctrl2, to } => {
-                    parts.push(format!(
-                        "C {} {} {}",
-                        format_point(ctrl1, precision),
-                        format_point(ctrl2, precision),
-                        format_point(to, precision)
-                    ));
-                }
-                PathCommand::Close => parts.push("Z".to_owned()),
-            }
-        }
-        parts.join(" ")
+        self.export_with(&SvgPathFormat::new(precision))
     }
-}
-
-fn format_point(point: Point, precision: usize) -> String {
-    format!(
-        "{},{}",
-        format_number(point.x, precision),
-        format_number(point.y, precision)
-    )
-}
-
-fn format_number(value: f64, precision: usize) -> String {
-    let zero_epsilon = 10.0_f64.powi(-(precision as i32 + 1));
-    let value = if value.abs() < zero_epsilon {
-        0.0
-    } else {
-        value
-    };
-    let mut text = format!("{value:.precision$}");
-    if text.contains('.') {
-        while text.ends_with('0') {
-            text.pop();
-        }
-        if text.ends_with('.') {
-            text.pop();
-        }
-    }
-    if text == "-0" { "0".to_owned() } else { text }
 }
