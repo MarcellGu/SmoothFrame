@@ -26,7 +26,7 @@ pub struct SmoothCornerGeometry {
     pub incoming_limit: f64,
     /// outgoing 方向的最大影响范围。
     pub outgoing_limit: f64,
-    /// incoming 与 outgoing 方向之间的夹角，单位为弧度。
+    /// incoming 与 outgoing 方向之间的内角，单位为弧度；圆弧总转角为其补角。
     pub angle: f64,
     /// 核心圆在未平滑时的切点距离。
     pub base_tangent: f64,
@@ -38,7 +38,7 @@ pub struct SmoothCornerGeometry {
     pub alpha0: f64,
     /// outgoing 侧过渡角，单位为弧度。
     pub alpha1: f64,
-    /// 中间圆弧段角度，单位为弧度。
+    /// 从圆弧总转角中扣除两端过渡角后的中间圆弧角度，单位为弧度。
     pub middle_arc_angle: f64,
     /// 角点 smooth cubic 的起点。
     pub start: Point,

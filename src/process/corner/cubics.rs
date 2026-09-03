@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use crate::output::path::CubicSegment;
 use crate::types::{Point, Vector};
 use crate::utils::EPSILON;
@@ -24,7 +26,7 @@ pub(super) fn build_cubics(geometry: SmoothCornerGeometry) -> Vec<CubicSegment> 
         geometry.radius,
         basis.e0,
         basis.e1,
-        geometry.angle - geometry.alpha1,
+        PI - geometry.angle - geometry.alpha1,
     );
     let handles = CornerHandles::from_geometry(geometry);
 
@@ -106,7 +108,7 @@ fn middle_cubic(
     arc_handle: f64,
 ) -> CubicSegment {
     let arc_tangent0 = circle_tangent(basis.e0, basis.e1, geometry.alpha0);
-    let arc_tangent1 = circle_tangent(basis.e0, basis.e1, geometry.angle - geometry.alpha1);
+    let arc_tangent1 = circle_tangent(basis.e0, basis.e1, PI - geometry.angle - geometry.alpha1);
     CubicSegment {
         from: p1,
         ctrl1: p1 + arc_tangent0 * arc_handle,

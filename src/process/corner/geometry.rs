@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use crate::utils::EPSILON;
 
 use super::{SmoothCornerGeometry, SmoothCornerRequest};
@@ -31,7 +33,7 @@ fn zero_radius_geometry(request: SmoothCornerRequest) -> SmoothCornerGeometry {
         outgoing_influence: 0.0,
         alpha0: 0.0,
         alpha1: 0.0,
-        middle_arc_angle: request.angle,
+        middle_arc_angle: PI - request.angle,
         start: request.origin,
         end: request.origin,
     }
@@ -44,9 +46,11 @@ fn nonzero_radius_geometry(request: SmoothCornerRequest, radius: f64) -> SmoothC
     let incoming_influence = raw_influence.min(request.incoming_limit);
     let outgoing_influence = raw_influence.min(request.outgoing_limit);
 
-    let alpha0 = (incoming_influence / base_tangent - 1.0) * request.angle / 2.0;
-    let alpha1 = (outgoing_influence / base_tangent - 1.0) * request.angle / 2.0;
-    let middle_arc_angle = (request.angle - alpha0 - alpha1).max(0.0);
+    // 圆弧沿边界行进方向转过内角的补角；两端过渡角与中间圆弧共用此转角。
+    let turn_angle = PI - request.angle;
+    let alpha0 = (incoming_influence / base_tangent - 1.0) * turn_angle / 2.0;
+    let alpha1 = (outgoing_influence / base_tangent - 1.0) * turn_angle / 2.0;
+    let middle_arc_angle = (turn_angle - alpha0 - alpha1).max(0.0);
 
     SmoothCornerGeometry {
         origin: request.origin,
